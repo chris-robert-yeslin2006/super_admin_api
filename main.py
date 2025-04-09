@@ -4,6 +4,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from models import OrganizationCreate, AdminCreate
 import os
+from fastapi.responses import JSONResponse
 
 load_dotenv()
 
@@ -11,7 +12,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3001",],
+    allow_origins=["*"],
     
     allow_credentials=True,
     allow_methods=["*"],
@@ -21,6 +22,9 @@ app.add_middleware(
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+print("Supabase URL:", SUPABASE_URL)
+print("Supabase KEY:", SUPABASE_KEY)
 
 @app.post("/organization/add")
 def add_organization(org: OrganizationCreate):
@@ -73,4 +77,61 @@ def list_admins(org_id: str = Query(default=None)):
     
     response = query.execute()
     return {"admins": response.data}
+
+@app.get("/analytics/students")
+def get_students_for_analytics(org_id: str = Query(...), language: str = Query(...)):
+    """
+    Fetch students for a specific organization and language
+    """
+    response = supabase.table("students").select(
+        "id, name, email, language, overall_mark, average_mark, recent_test_mark, "
+        "fluency_mark, vocab_mark, sentence_mastery, pronunciation"
+    ).eq("org_id", org_id).eq("language", language).execute()
+
+    return {"students": response.data}
+
+@app.get("/analytics/summary")
+def get_summary_for_language(org_id: str = Query(...), language: str = Query(...)):
+    """
+    Provide summary statistics (like averages) for a given organization and language
+    """
+    response = supabase.table("students").select(
+        "overall_mark, fluency_mark, vocab_mark, pronunciation"
+    ).eq("org_id", org_id).eq("language", language).execute()
+
+    data = response.data
+    if not data:
+        return {"summary": {}}
+
+    # Compute averages
+    total = len(data)
+    summary = {
+        "avg_overall": sum(s["overall_mark"] for s in data) / total,
+        "avg_fluency": sum(s["fluency_mark"] for s in data) / total,
+        "avg_vocab": sum(s["vocab_mark"] for s in data) / total,
+        "avg_pronunciation": sum(s["pronunciation"] for s in data) / total,
+    }
+
+    return {"summary": summary}
+
+@app.get("/analytics/language-detail")
+def get_language_detail(org_id: str, language: str):
+    students = supabase.table("students").select("*")\
+        .eq("org_id", org_id).eq("language", language).execute().data
+
+    if not students:
+        return {"message": "No data", "total_students": 0}
+
+    average = sum(s["overall_mark"] for s in students) / len(students)
+    top_student = max(students, key=lambda s: s["overall_mark"])
+
+    return {
+        "language": language,
+        "total_students": len(students),
+        "average_mark": average,
+        "top_student": {
+            "name": top_student["name"],
+            "overall_mark": top_student["overall_mark"]
+        }
+    }
 
