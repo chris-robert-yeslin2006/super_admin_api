@@ -15,6 +15,13 @@ class OrganizationCreate(OrganizationBase):
 class OrganizationOut(OrganizationBase):
     id: str
 
+# class OrganizationCreate(BaseModel):
+#     name: str
+#     head: str
+#     ambassador_name: str
+#     ambassador_contact: str
+#     contact: str
+
 
 # -------- ADMIN MODELS --------
 class AdminBase(BaseModel):

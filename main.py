@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 from models import OrganizationCreate, AdminCreate
 import os
 from fastapi.responses import JSONResponse
+from fastapi import Path
+from fastapi import Body
 
 load_dotenv()
 
@@ -135,3 +137,21 @@ def get_language_detail(org_id: str, language: str):
         }
     }
 
+@app.put("/organization/update/{org_id}")
+def update_organization(org_id: str, updated_data: dict = Body(...)):
+    existing = supabase.table("organizations").select("*").eq("id", org_id).execute()
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    response = supabase.table("organizations").update(updated_data).eq("id", org_id).execute()
+
+    return {"message": "Organization updated", "data": response.data}
+
+@app.delete("/organization/delete/{org_id}")
+def delete_organization(org_id: str = Path(..., description="The ID of the organization to delete")):
+    existing = supabase.table("organizations").select("*").eq("id", org_id).execute()
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    response = supabase.table("organizations").delete().eq("id", org_id).execute()
+    return {"message": "Organization deleted", "data": response.data}
