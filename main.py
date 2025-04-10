@@ -7,6 +7,10 @@ import os
 from fastapi.responses import JSONResponse
 from fastapi import Path
 from fastapi import Body
+from fastapi import Form
+from auth_utils import create_access_token, verify_password
+from fastapi import Depends
+from fastapi.security import OAuth2PasswordBearer
 
 load_dotenv()
 
@@ -155,3 +159,13 @@ def delete_organization(org_id: str = Path(..., description="The ID of the organ
 
     response = supabase.table("organizations").delete().eq("id", org_id).execute()
     return {"message": "Organization deleted", "data": response.data}
+
+@app.post("/auth/login")
+def login(email: str = Form(...), password: str = Form(...)):
+    user_data = supabase.table("super_admins").select("*").eq("email", email).single().execute()
+
+    if not user_data.data or not verify_password(password, user_data.data["password"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    token = create_access_token({"sub": user_data.data["email"]})
+    return {"access_token": token, "token_type": "bearer"}
